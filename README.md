@@ -38,19 +38,30 @@ ros2_ws/src/
 ## System Architecture
 
 ```
-/imu/data ──────────────────────┐
-                                 ▼
-/cmd_vel ──► [Velocity PID] ──► [Balance PID] ──► /left_wheel_effort_controller/commands
-                                                ──► /right_wheel_effort_controller/commands
-/joint_states ──► (wheel velocity feedback)
+/imu/data  ──► theta (pitch angle)
+/odom      ──► current_vx (velocity feedback)
+/cmd_vel   ──► user command
+
+[Velocity PID]  : (cmd_vx - current_vx) → theta_setpoint (±0.12 rad)
+[Balance PID]   : (theta_setpoint - theta) → v_out (m/s)
+
+v_out, cmd_wz ──► /cmd_vel_wheels ──► libgazebo_ros_diff_drive ──► wheels
 ```
 
 ### Control Strategy
 
 | Loop | Input | Output | Rate |
 |------|-------|--------|------|
-| Balance (inner) | IMU pitch (θ) | Wheel effort (Nm) | 500 Hz |
-| Velocity (outer) | cmd_vel vs wheel odometry | Tilt setpoint | 500 Hz |
+| Balance (inner) | IMU pitch θ [rad] | Wheel linear velocity [m/s] | 200 Hz |
+| Velocity (outer) | cmd_vel vs odom | Tilt setpoint [rad] | 200 Hz |
+
+### Startup Sequence (pause → control → unpause)
+
+```
+t=0s  Gazebo starts (physics PAUSED)
+t=2s  balance_controller_node starts
+t=3s  /unpause_physics called → physics begins
+```
 
 ---
 
@@ -98,3 +109,11 @@ See [docs/01_modeling.md](docs/01_modeling.md) for:
 - Inertia tensor calculations
 - Linearized state-space equations
 - PID and LQR control strategy
+
+## Development Log
+
+See [docs/02_dev_log.md](docs/02_dev_log.md) for:
+- Plugin migration: gazebo_ros2_control → libgazebo_ros_diff_drive
+- Cascade PID implementation details
+- Startup sequence design (pause/unpause)
+- Troubleshooting record

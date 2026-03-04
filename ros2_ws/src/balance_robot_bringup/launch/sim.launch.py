@@ -1,18 +1,16 @@
 """
-sim.launch.py  — One-shot launch for full simulation
-
-Starts:
-  1. Gazebo (world + robot spawn + ros2_control)
-  2. Balance controller node (with PID params)
-
-Usage:
-    ros2 launch balance_robot_bringup sim.launch.py
-    ros2 launch balance_robot_bringup sim.launch.py use_rviz:=true
+sim.launch.py
+1. Gazebo starts PAUSED (physics frozen)
+2. Controller node starts (0.5s)
+3. Gazebo unpauses → controller is ready from the first physics tick
 """
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument, IncludeLaunchDescription,
+    TimerAction, ExecuteProcess,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -30,20 +28,20 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
 
     return LaunchDescription([
-        DeclareLaunchArgument('use_rviz',     default_value='false',
-                              description='Launch RViz2 alongside Gazebo'),
+        DeclareLaunchArgument('use_rviz',     default_value='false'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
 
-        # --- 1. Gazebo simulation ---
+        # 1. Gazebo — start PAUSED so robot doesn't fall before controller is ready
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(pkg_gazebo, 'launch', 'gazebo.launch.py')
             ),
+            launch_arguments={'paused': 'true'}.items(),
         ),
 
-        # --- 2. Balance controller (delayed 3s to let Gazebo fully start) ---
+        # 2. Balance controller starts first (physics still paused)
         TimerAction(
-            period=3.0,
+            period=2.0,
             actions=[
                 Node(
                     package='balance_robot_controller',
@@ -51,13 +49,23 @@ def generate_launch_description():
                     name='balance_controller',
                     output='screen',
                     parameters=[pid_params, {'use_sim_time': use_sim_time}],
-                    # Enable debug logging:
-                    # arguments=['--ros-args', '--log-level', 'debug'],
                 ),
             ]
         ),
 
-        # --- 3. RViz2 (optional) ---
+        # 3. Unpause Gazebo after controller is ready
+        TimerAction(
+            period=3.0,
+            actions=[
+                ExecuteProcess(
+                    cmd=['ros2', 'service', 'call',
+                         '/unpause_physics', 'std_srvs/srv/Empty', '{}'],
+                    output='screen',
+                ),
+            ]
+        ),
+
+        # 4. RViz2 (optional)
         TimerAction(
             period=2.0,
             actions=[

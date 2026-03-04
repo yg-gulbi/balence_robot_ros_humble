@@ -10,6 +10,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -18,7 +19,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
 
-    robot_description = Command(['xacro ', xacro_file])
+    robot_description = ParameterValue(Command(['xacro ', xacro_file]), value_type=str)
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='false'),

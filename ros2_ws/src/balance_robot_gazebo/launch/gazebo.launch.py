@@ -1,51 +1,51 @@
 """
 gazebo.launch.py
-Launches Gazebo with the balance robot spawned in the empty world.
-
-Usage:
-    ros2 launch balance_robot_gazebo gazebo.launch.py
+Launches Gazebo with the balance robot.
+Control is handled by libgazebo_ros_diff_drive plugin (no ros2_control needed).
 """
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-    IncludeLaunchDescription,
-    ExecuteProcess,
-)
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    pkg_desc    = get_package_share_directory('balance_robot_description')
-    pkg_gazebo  = get_package_share_directory('balance_robot_gazebo')
+    pkg_desc      = get_package_share_directory('balance_robot_description')
+    pkg_gazebo    = get_package_share_directory('balance_robot_gazebo')
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
 
-    world_file  = os.path.join(pkg_gazebo, 'worlds', 'empty.world')
-    xacro_file  = os.path.join(pkg_desc,   'urdf',   'balance_robot.xacro')
+    world_file = os.path.join(pkg_gazebo, 'worlds', 'empty.world')
+    xacro_file = os.path.join(pkg_desc,   'urdf',   'balance_robot.xacro')
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
     x_pose       = LaunchConfiguration('x_pose',       default='0.0')
-    z_pose       = LaunchConfiguration('z_pose',       default='0.12')  # slightly above ground
+    z_pose       = LaunchConfiguration('z_pose',       default='0.12')
+    paused       = LaunchConfiguration('paused',        default='false')
 
-    robot_description = Command(['xacro ', xacro_file])
+    robot_description = ParameterValue(Command(['xacro ', xacro_file]), value_type=str)
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('x_pose',       default_value='0.0'),
         DeclareLaunchArgument('z_pose',       default_value='0.12'),
+        DeclareLaunchArgument('paused',        default_value='false'),
 
-        # --- Gazebo server + client ---
+        # Gazebo
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(pkg_gazebo_ros, 'launch', 'gazebo.launch.py')
             ),
-            launch_arguments={'world': world_file}.items(),
+            launch_arguments={
+                'world':  world_file,
+                'paused': paused,
+            }.items(),
         ),
 
-        # --- robot_state_publisher ---
+        # robot_state_publisher
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -57,7 +57,7 @@ def generate_launch_description():
             }],
         ),
 
-        # --- Spawn robot in Gazebo ---
+        # Spawn robot
         Node(
             package='gazebo_ros',
             executable='spawn_entity.py',
@@ -69,25 +69,5 @@ def generate_launch_description():
                 '-x', x_pose,
                 '-z', z_pose,
             ],
-        ),
-
-        # --- ros2_control: load controllers ---
-        ExecuteProcess(
-            cmd=['ros2', 'control', 'load_controller',
-                 '--set-state', 'active',
-                 'joint_state_broadcaster'],
-            output='screen',
-        ),
-        ExecuteProcess(
-            cmd=['ros2', 'control', 'load_controller',
-                 '--set-state', 'active',
-                 'left_wheel_effort_controller'],
-            output='screen',
-        ),
-        ExecuteProcess(
-            cmd=['ros2', 'control', 'load_controller',
-                 '--set-state', 'active',
-                 'right_wheel_effort_controller'],
-            output='screen',
         ),
     ])
