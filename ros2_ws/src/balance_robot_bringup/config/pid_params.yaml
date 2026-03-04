@@ -1,0 +1,23 @@
+/**:
+  ros__parameters:
+    # ── Balance (inner) PID ──────────────────────────────────────────
+    # Controls: tilt angle → wheel effort
+    # Tuning guide:
+    #   1. Start with Kp only (Ki=Kd=0). Increase until robot oscillates.
+    #   2. Reduce Kp by ~20%, add Kd to dampen oscillation.
+    #   3. Add small Ki to eliminate steady-state lean.
+    balance_kp: 80.0
+    balance_ki:  2.0
+    balance_kd: 10.0
+
+    # ── Velocity (outer) PID ─────────────────────────────────────────
+    # Controls: cmd_vel error → tilt angle setpoint
+    vel_kp: 0.5
+    vel_ki: 0.05
+    vel_kd: 0.01
+
+    # ── Safety & limits ──────────────────────────────────────────────
+    theta_max:      0.35   # [rad] ~20°: motors cut if robot tips beyond this
+    max_effort:    10.0    # [Nm]  maximum torque command
+    vel_theta_max:  0.15   # [rad] maximum tilt setpoint from velocity loop
+    wheel_radius:   0.05   # [m]
